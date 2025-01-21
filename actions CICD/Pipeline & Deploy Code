@@ -1,0 +1,69 @@
+name: CI/CD Pipeline for Node.js App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: npm install
+
+    # Step 4: Lint code
+    - name: Lint code
+      run: npm run lint
+
+    # Step 5: Run tests
+    - name: Run tests
+      run: npm test
+
+    # Step 6: Package the application
+    - name: Package application
+      run: |
+        npm run build || echo "No build script, skipping"
+        tar -czvf app.tar.gz .
+
+    # Step 7: Deploy to Azure VM
+    - name: Deploy to Azure VM
+      env:
+        AZURE_HOST: ${{ secrets.AZURE_VM_HOST }}
+        AZURE_USERNAME: ${{ secrets.AZURE_VM_USERNAME }}
+        AZURE_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+      run: |
+        echo "$AZURE_PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+
+        # Copy the packaged application to the Azure VM
+        scp -i private_key.pem app.tar.gz $AZURE_USERNAME@$AZURE_HOST:/tmp/app.tar.gz
+
+        # Connect to the Azure VM and deploy the application
+        ssh -i private_key.pem $AZURE_USERNAME@$AZURE_HOST <<EOF
+          set -e
+          cd /tmp
+          tar -xzvf app.tar.gz -C /var/www/your-app
+          cd /var/www/your-app
+          npm install --production
+          pm2 reload ecosystem.config.js || pm2 start app.js --name your-app
+        EOF
+
+    # Step 8: Clean up the private key
+    - name: Clean up
+      run: rm -f private_key.pem
