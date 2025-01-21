@@ -1,0 +1,62 @@
+name: Node.js CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Set up Node.js environment
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16' # Ensure compatibility with your project requirements
+        cache: 'npm'
+
+    # Install dependencies
+    - name: Install dependencies
+      run: npm install
+
+    # Run tests
+    - name: Run tests
+      run: npm test # Ensure test scripts are defined in package.json
+
+    # Build the application (if applicable)
+    - name: Build the application
+      run: npm run build # Replace with the actual build command if needed
+
+    # Archive built artifacts (optional)
+    - name: Upload build artifacts
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: ./dist # Replace with your build output directory
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Deploy the application (customize for your hosting solution) #Deployment script is based on requirement and cloud platform where you are going to deploy
+    - name: Deploy to server
+      run: |
+        echo "Starting deployment..."
+        # Example using SSH for deployment
+        ssh user@your-server "cd /path/to/project && git pull && npm install && pm2 restart app"
